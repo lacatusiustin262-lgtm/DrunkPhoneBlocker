@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   StyleSheet,
+  Platform,
 } from 'react-native'
 import { router } from 'expo-router'
 import { Feather } from '@expo/vector-icons'
@@ -97,7 +98,7 @@ export default function Setup() {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={COLORS.primary} size="large" />
-        <Text style={styles.loadingText}>Pregătesc blocarea...</Text>
+        <Text style={styles.loadingText}>Pregătesc blocarea…</Text>
       </View>
     )
   }
@@ -109,7 +110,7 @@ export default function Setup() {
     >
       <View style={styles.header}>
         <View style={styles.logoBox}>
-          <Feather name="clock" size={34} color={COLORS.primary} />
+          <Feather name="clock" size={36} color={COLORS.primary} />
         </View>
         <Text style={styles.title}>DrunkPhone Blocker</Text>
         <Text style={styles.subtitle}>
@@ -246,11 +247,18 @@ export default function Setup() {
               <Feather name="lock" size={22} color={COLORS.text} />
             )}
             <Text style={styles.buttonText}>
-              {loading ? 'Pornire...' : 'Blochează telefonul'}
+              {loading ? 'Pornire…' : 'Blochează telefonul'}
             </Text>
             <Feather name="arrow-right" size={20} color={COLORS.text} style={styles.arrow} />
           </View>
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.platformNote}>
+        <Text style={styles.platformNoteText}>
+          Blocarea este o interfață de countdown — telefonul rămâne pe acest ecran.
+          Nu poate ascunde butonul Home (limită Android/iOS).
+        </Text>
       </View>
     </ScrollView>
   )
@@ -271,15 +279,16 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
     gap: 4,
+    minHeight: Platform.OS === 'web' ? undefined : 'auto',
   },
   header: {
     alignItems: 'center',
     marginBottom: 28,
   },
   logoBox: {
-    width: 72,
-    height: 72,
-    borderRadius: 24,
+    width: 76,
+    height: 76,
+    borderRadius: 26,
     backgroundColor: COLORS.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
@@ -288,7 +297,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.primary,
   },
   title: {
-    fontSize: 30,
+    fontSize: 32,
     fontWeight: '800',
     color: COLORS.text,
     letterSpacing: -0.5,
@@ -311,9 +320,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   iconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 11,
     backgroundColor: COLORS.surfaceElevated,
     alignItems: 'center',
     justifyContent: 'center',
@@ -388,8 +397,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   addButton: {
-    width: 46,
-    height: 46,
+    width: 48,
+    height: 48,
     borderRadius: 12,
     backgroundColor: COLORS.surfaceElevated,
     alignItems: 'center',
@@ -471,5 +480,16 @@ const styles = StyleSheet.create({
   },
   arrow: {
     marginLeft: 2,
+  },
+  platformNote: {
+    marginTop: 20,
+    paddingHorizontal: 4,
+  },
+  platformNoteText: {
+    fontSize: 12,
+    color: COLORS.textInactive,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 16,
   },
 })

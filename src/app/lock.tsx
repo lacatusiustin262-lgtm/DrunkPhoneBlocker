@@ -8,11 +8,11 @@ import {
   Alert,
   StyleSheet,
   Image,
-  Linking,
   Platform,
   Dimensions,
   StyleProp,
   ViewStyle,
+  Linking,
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { useKeepAwake } from 'expo-keep-awake'
@@ -36,6 +36,7 @@ import {
   deletePhoto,
 } from '../lib/db'
 import { COLORS, formatTimeLeft } from '../theme'
+import { AnimatedTimer } from '../components/AnimatedTimer'
 
 const { width } = Dimensions.get('window')
 
@@ -84,14 +85,14 @@ export default function Lock() {
   const [cameraType, setCameraType] = useState<'front' | 'back'>('back')
   const cameraRef = useRef<any>(null)
   const [photos, setPhotos] = useState<{ uri: string }[]>([])
-const [cameraError, setCameraError] = useState<string | null>(null)
+  const [cameraError, setCameraError] = useState<string | null>(null)
 
-// Voice note
-const [voiceRecording, setVoiceRecording] = useState(false)
-const [voiceUri, setVoiceUri] = useState<string | null>(null)
-const [voicePlaying, setVoicePlaying] = useState(false)
-const recordingRef = useRef<Audio.AudioRecording | null>(null)
-const soundRef = useRef<Audio.Sound | null>(null)
+  // Voice note
+  const [voiceRecording, setVoiceRecording] = useState(false)
+  const [voiceUri, setVoiceUri] = useState<string | null>(null)
+  const [voicePlaying, setVoicePlaying] = useState(false)
+  const recordingRef = useRef<Audio.Recording | null>(null)
+  const soundRef = useRef<Audio.Sound | null>(null)
 
   const startTimer = useCallback((endAt: number) => {
     const tick = () => {
@@ -250,8 +251,8 @@ const soundRef = useRef<Audio.Sound | null>(null)
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
         })
-        const recording = new Audio.AudioRecording()
-        await recording.prepareToRecordAsync(Audio.RecordingPresets.HIGH_QUALITY)
+        const recording = new Audio.Recording()
+        await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
         await recording.startAsync()
         recordingRef.current = recording
         setVoiceRecording(true)
@@ -267,12 +268,12 @@ const soundRef = useRef<Audio.Sound | null>(null)
     if (!voiceUri) return
     try {
       setVoicePlaying(true)
-      const sound = new Audio.Sound()
-      await sound.loadAsync({ uri: voiceUri })
+      const { sound } = await Audio.Sound.createAsync({ uri: voiceUri })
       await sound.playAsync()
       soundRef.current = sound
       sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isPlaying && status.didJustFinish) {
+        const s = status as { isPlaying?: boolean; didJustFinish?: boolean }
+        if (!s.isPlaying && s.didJustFinish) {
           setVoicePlaying(false)
           soundRef.current = null
         }
@@ -307,7 +308,8 @@ const soundRef = useRef<Audio.Sound | null>(null)
     router.push(`/unlock?sessionId=${session.id}`)
   }
 
-  const { h, m, s, text } = formatTimeLeft(timeLeft)
+  const { text } = formatTimeLeft(timeLeft)
+  const totalSeconds = session ? session.durationHours * 3600 : 0
 
   if (!session) {
     return null
@@ -319,12 +321,16 @@ const soundRef = useRef<Audio.Sound | null>(null)
         <View style={styles.center}>
           <Feather name="check-circle" color={COLORS.success} size={64} />
           <Text style={styles.bigText}>Telefonul s-a deblocat!</Text>
-          <Text style={styles.subText}>Ai fost blocat {session.durationHours} ore.</Text>
+          <Text style={styles.subText}>
+            Ai fost blocat {session.durationHours} ore.
+          </Text>
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={() => router.replace('/morning')}
           >
-            <Text style={styles.buttonText}>Vezi pozele și notele de ieri noapte</Text>
+            <Text style={styles.buttonText}>
+              Vezi pozele și notele de ieri noapte
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -347,27 +353,27 @@ const soundRef = useRef<Audio.Sound | null>(null)
 
         {/* Timer */}
         <View style={styles.timerCard}>
-          <Text style={styles.timerLabel}>Rămâne până la deblocare</Text>
-          <Text style={styles.timer}>{text}</Text>
-          <View style={styles.timerUnits}>
-            <View style={styles.unit}>
-              <Text style={styles.unitValue}>{String(h).padStart(2, '0')}</Text>
-              <Text style={styles.unitLabel}>ORE</Text>
-            </View>
-            <View style={styles.unit}>
-              <Text style={styles.unitValue}>{String(m).padStart(2, '0')}</Text>
-              <Text style={styles.unitLabel}>MIN</Text>
-            </View>
-            <View style={styles.unit}>
-              <Text style={styles.unitValue}>{String(s).padStart(2, '0')}</Text>
-              <Text style={styles.unitLabel}>SEC</Text>
-            </View>
+          <AnimatedTimer
+            totalDurationSeconds={totalSeconds}
+            secondsLeft={Math.max(0, timeLeft)}
+            formattedTime={text}
+            targetTimeLabel={`07:00 Dimineața`}
+          />
+          <View style={styles.timerHint}>
+            <Feather name="clock" size={12} color={COLORS.textMuted} />
+            <Text style={styles.timerHintText}>
+              Telefonul revine la {text} —{fmtDuration(session.durationHours)} ore blocat.
+            </Text>
           </View>
           <View style={styles.progressTrack}>
             <View
               style={[
                 styles.progressFill,
-                { width: `${Math.max(0, Math.min(100, 100 - (timeLeft / (session.durationHours * 3600)) * 100))}%` },
+                {
+                  width: `${
+                    Math.max(0, Math.min(100, 100 - (timeLeft / totalSeconds) * 100))
+                  }%`,
+                },
               ] as StyleProp<ViewStyle>}
             />
           </View>
@@ -408,7 +414,7 @@ const soundRef = useRef<Audio.Sound | null>(null)
           <TextInput
             style={styles.noteInput}
             placeholderTextColor={COLORS.textMuted}
-            placeholder="Scrie ceva pentru că vei primi de citit mâine..."
+            placeholder="Scrie ceva pentru că vei primi de citit mâine…"
             value={noteText}
             onChangeText={setNoteText}
             multiline
@@ -431,7 +437,7 @@ const soundRef = useRef<Audio.Sound | null>(null)
               onPress={toggleRecording}
             >
               <View style={styles.recordIcon}>
-                <Feather name="stop" color={COLORS.text} size={24} />
+                <Feather name="stop-circle" color={COLORS.text} size={24} />
               </View>
               <Text style={[styles.recordText, styles.recordTextRecording]}>
                 Stop înregistrarea
@@ -446,7 +452,11 @@ const soundRef = useRef<Audio.Sound | null>(null)
                   style={[styles.voiceControlButton, voicePlaying && styles.voiceControlDelete]}
                   onPress={voicePlaying ? stopVoice : playVoice}
                 >
-                  <Feather name={voicePlaying ? 'stop' : 'play'} color={COLORS.text} size={20} />
+                  <Feather
+                    name={voicePlaying ? ('stop-circle' as const) : ('play' as const)}
+                    color={COLORS.text}
+                    size={20}
+                  />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.voiceControlButton} onPress={deleteVoice}>
                   <Feather name="trash-2" color={COLORS.danger} size={18} />
@@ -572,42 +582,18 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  timerLabel: {
-    fontSize: 15,
-    color: COLORS.textMuted,
-    fontWeight: '600',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  timer: {
-    fontSize: 56,
-    fontWeight: '900',
-    color: COLORS.primary,
-    letterSpacing: -2,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    marginBottom: 12,
-  },
-  timerUnits: {
+  timerHint: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 10,
-    marginBottom: 16,
-  },
-  unit: {
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 10,
   },
-  unitValue: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: COLORS.text,
-  },
-  unitLabel: {
-    fontSize: 10,
+  timerHintText: {
+    fontSize: 13,
     color: COLORS.textMuted,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    marginTop: 2,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   progressTrack: {
     width: '100%',
@@ -615,6 +601,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.surfaceElevated,
     borderRadius: 3,
     overflow: 'hidden',
+    marginTop: 14,
   },
   progressFill: {
     height: 6,
@@ -905,3 +892,7 @@ const styles = StyleSheet.create({
     padding: 32,
   },
 })
+
+function fmtDuration(hours: number): string {
+  return hours === 1 ? '1 oră' : `${hours} ore`
+}

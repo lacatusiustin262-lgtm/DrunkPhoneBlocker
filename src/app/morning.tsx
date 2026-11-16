@@ -76,7 +76,8 @@ export default function Morning() {
     setPhotos(photos.filter((p) => p.id !== id))
   }
 
-  const toggleVoiceNote = async (id: number, uri: string) => {
+  const toggleVoiceNote = async (id: number, uri: string | null) => {
+    if (!uri) return
     if (playingNoteId === id && voicePlaying) {
       await voiceSoundRef.current?.stopAsync()
       await voiceSoundRef.current?.unloadAsync()
@@ -91,12 +92,12 @@ export default function Morning() {
     try {
       setPlayingNoteId(id)
       setVoicePlaying(true)
-      const sound = new Audio.Sound()
-      await sound.loadAsync({ uri })
+      const { sound } = await Audio.Sound.createAsync({ uri })
       await sound.playAsync()
       voiceSoundRef.current = sound
       sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isPlaying && status.didJustFinish) {
+        const s = status as { isPlaying?: boolean; didJustFinish?: boolean }
+        if (!s.isPlaying && s.didJustFinish) {
           setVoicePlaying(false)
           setPlayingNoteId(null)
           voiceSoundRef.current = null
@@ -200,7 +201,7 @@ export default function Morning() {
                           onPress={() => toggleVoiceNote(n.id, n.audioUri)}
                         >
                           <Feather
-                            name={playingNoteId === n.id && voicePlaying ? 'stop' : 'play'}
+                            name={playingNoteId === n.id && voicePlaying ? ('stop-circle' as const) : ('play' as const)}
                             color={COLORS.accent}
                             size={16}
                           />

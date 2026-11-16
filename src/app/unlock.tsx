@@ -80,7 +80,9 @@ export default function Unlock() {
     <View style={styles.screen}>
       <View style={styles.content}>
         <View style={styles.header}>
-          <Feather name="lock" size={36} color={COLORS.primary} />
+          <View style={styles.iconBox}>
+            <Feather name="lock" size={36} color={COLORS.primary} />
+          </View>
           <Text style={styles.title}>Deblocare anticipată</Text>
           <Text style={styles.subtitle}>
             Introdu codul pe care l-ai dat persoanei de încredere.
@@ -104,7 +106,7 @@ export default function Unlock() {
             </Text>
           </View>
         ) : (
-          <View style={styles.hintBox}>
+          <View style={styles.hintBoxDanger}>
             <Feather name="alert-circle" size={18} color={COLORS.danger} />
             <Text style={styles.hintTextDanger}>
               Nu este configurat niciun cod de deblocare pentru această
@@ -145,6 +147,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 24,
     gap: 4,
+    flex: 1,
   },
   center: {
     flex: 1,
@@ -155,8 +158,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 26,
   },
+  iconBox: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    backgroundColor: COLORS.primaryContainer,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceBorder,
+  },
   title: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
     color: COLORS.text,
     marginTop: 14,
@@ -186,8 +200,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     flex: 1,
   },
+  hintBoxDanger: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: COLORS.dangerBg,
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 18,
+  },
   hintTextDanger: {
+    fontSize: 14,
     color: COLORS.danger,
+    lineHeight: 20,
+    flex: 1,
   },
   backButton: {
     flexDirection: 'row',
