@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import {
   deletePhoto,
 } from '../lib/db'
 import { File } from 'expo-file-system'
+import { Audio } from 'expo-av'
 import { COLORS, formatTimeLeft } from '../theme'
 
 export default function Morning() {
@@ -37,6 +38,9 @@ export default function Morning() {
   }[]>([])
   const [photos, setPhotos] = useState<{ id: number; uri: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [playingNoteId, setPlayingNoteId] = useState<number | null>(null)
+  const [voicePlaying, setVoicePlaying] = useState(false)
+  const voiceSoundRef = useRef<Audio.Sound | null>(null)
 
   useEffect(() => {
     ;(async () => {
@@ -70,6 +74,39 @@ export default function Morning() {
     }
     await deletePhoto(id)
     setPhotos(photos.filter((p) => p.id !== id))
+  }
+
+  const toggleVoiceNote = async (id: number, uri: string) => {
+    if (playingNoteId === id && voicePlaying) {
+      await voiceSoundRef.current?.stopAsync()
+      await voiceSoundRef.current?.unloadAsync()
+      voiceSoundRef.current = null
+      setVoicePlaying(false)
+      setPlayingNoteId(null)
+      return
+    }
+    await voiceSoundRef.current?.stopAsync()
+    await voiceSoundRef.current?.unloadAsync()
+    voiceSoundRef.current = null
+    try {
+      setPlayingNoteId(id)
+      setVoicePlaying(true)
+      const sound = new Audio.Sound()
+      await sound.loadAsync({ uri })
+      await sound.playAsync()
+      voiceSoundRef.current = sound
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isPlaying && status.didJustFinish) {
+          setVoicePlaying(false)
+          setPlayingNoteId(null)
+          voiceSoundRef.current = null
+        }
+      })
+    } catch (error) {
+      console.error(error)
+      setVoicePlaying(false)
+      setPlayingNoteId(null)
+    }
   }
 
   const uriFor = (uri: string) =>
@@ -156,10 +193,19 @@ export default function Morning() {
                   {n.type === 'voice' ? (
                     <>
                       <Feather name="mic" color={COLORS.accent} size={16} style={styles.noteIconMini} />
-                      <Text style={styles.noteText}>
-                        Notă vocală salvată
-                        {n.audioUri ? ' (apasă pe ștergere pentru a o elimina)' : ''}
-                      </Text>
+                      <Text style={styles.noteText}>Notă vocală salvată</Text>
+                      {n.audioUri && (
+                        <TouchableOpacity
+                          style={styles.notePlayButton}
+                          onPress={() => toggleVoiceNote(n.id, n.audioUri)}
+                        >
+                          <Feather
+                            name={playingNoteId === n.id && voicePlaying ? 'stop' : 'play'}
+                            color={COLORS.accent}
+                            size={16}
+                          />
+                        </TouchableOpacity>
+                      )}
                     </>
                   ) : (
                     <Text style={styles.noteText}>{n.content}</Text>
@@ -334,6 +380,9 @@ const styles = StyleSheet.create({
     color: COLORS.text,
   },
   noteDelete: {
+    padding: 6,
+  },
+  notePlayButton: {
     padding: 6,
   },
   emptyState: {

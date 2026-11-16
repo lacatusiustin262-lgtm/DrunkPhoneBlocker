@@ -21,6 +21,7 @@ import { setStatusBarHidden } from 'expo-status-bar'
 import * as ScreenCapture from 'expo-screen-capture'
 import ExpoCamera from 'expo-camera/build/ExpoCamera'
 import { useCameraPermissions } from 'expo-camera'
+import { Audio } from 'expo-av'
 import { File } from 'expo-file-system'
 import { Feather } from '@expo/vector-icons'
 import {
@@ -84,6 +85,13 @@ export default function Lock() {
   const cameraRef = useRef<any>(null)
   const [photos, setPhotos] = useState<{ uri: string }[]>([])
 const [cameraError, setCameraError] = useState<string | null>(null)
+
+// Voice note
+const [voiceRecording, setVoiceRecording] = useState(false)
+const [voiceUri, setVoiceUri] = useState<string | null>(null)
+const [voicePlaying, setVoicePlaying] = useState(false)
+const recordingRef = useRef<Audio.AudioRecording | null>(null)
+const soundRef = useRef<Audio.Sound | null>(null)
 
   const startTimer = useCallback((endAt: number) => {
     const tick = () => {
@@ -220,6 +228,80 @@ const [cameraError, setCameraError] = useState<string | null>(null)
     })()
   }
 
+  const toggleRecording = async () => {
+    if (!session) return
+    if (voiceRecording) {
+      await recordingRef.current?.stopAndUnloadAsync()
+      const uri = recordingRef.current?.getURI() ?? null
+      if (uri) {
+        setVoiceUri(uri)
+        await addNote(session.id, 'voice', null, uri)
+      }
+      setVoiceRecording(false)
+      recordingRef.current = null
+    } else {
+      try {
+        const { status } = await Audio.requestPermissionsAsync()
+        if (status !== 'granted') {
+          Alert.alert('Microfonul este necesar pentru înregistrarea vocale.')
+          return
+        }
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        })
+        const recording = new Audio.AudioRecording()
+        await recording.prepareToRecordAsync(Audio.RecordingPresets.HIGH_QUALITY)
+        await recording.startAsync()
+        recordingRef.current = recording
+        setVoiceRecording(true)
+        setVoiceUri(null)
+      } catch (error) {
+        console.error(error)
+        Alert.alert('Nu s-a putut porni înregistrarea.')
+      }
+    }
+  }
+
+  const playVoice = async () => {
+    if (!voiceUri) return
+    try {
+      setVoicePlaying(true)
+      const sound = new Audio.Sound()
+      await sound.loadAsync({ uri: voiceUri })
+      await sound.playAsync()
+      soundRef.current = sound
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isPlaying && status.didJustFinish) {
+          setVoicePlaying(false)
+          soundRef.current = null
+        }
+      })
+    } catch (error) {
+      console.error(error)
+      setVoicePlaying(false)
+      Alert.alert('Nu s-a putut reda nota vocală.')
+    }
+  }
+
+  const stopVoice = async () => {
+    await soundRef.current?.stopAsync()
+    await soundRef.current?.unloadAsync()
+    soundRef.current = null
+    setVoicePlaying(false)
+  }
+
+  const deleteVoice = async () => {
+    try {
+      const file = new File(voiceUri!)
+      if (file.exists) file.delete()
+    } catch {
+      // ignore file errors
+    }
+    setVoiceUri(null)
+    setVoicePlaying(false)
+  }
+
   const goUnlock = () => {
     if (!session) return
     router.push(`/unlock?sessionId=${session.id}`)
@@ -335,6 +417,50 @@ const [cameraError, setCameraError] = useState<string | null>(null)
           <TouchableOpacity style={styles.saveNoteButton} onPress={saveTextNote}>
             <Text style={styles.saveNoteText}>Salvează nota</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Voice note */}
+        <View style={styles.section}>
+          <View style={styles.sectionRow}>
+            <Feather name="mic" color={COLORS.accent} size={18} />
+            <Text style={styles.sectionTitle}>Notă vocală pentru mâine</Text>
+          </View>
+          {voiceRecording ? (
+            <TouchableOpacity
+              style={[styles.recordButton, styles.recordButtonRecording]}
+              onPress={toggleRecording}
+            >
+              <View style={styles.recordIcon}>
+                <Feather name="stop" color={COLORS.text} size={24} />
+              </View>
+              <Text style={[styles.recordText, styles.recordTextRecording]}>
+                Stop înregistrarea
+              </Text>
+            </TouchableOpacity>
+          ) : voiceUri ? (
+            <View style={styles.voiceCard}>
+              <Feather name="mic" color={COLORS.accent} size={20} />
+              <Text style={styles.voiceText}>Notă vocală salvată</Text>
+              <View style={styles.voiceControls}>
+                <TouchableOpacity
+                  style={[styles.voiceControlButton, voicePlaying && styles.voiceControlDelete]}
+                  onPress={voicePlaying ? stopVoice : playVoice}
+                >
+                  <Feather name={voicePlaying ? 'stop' : 'play'} color={COLORS.text} size={20} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.voiceControlButton} onPress={deleteVoice}>
+                  <Feather name="trash-2" color={COLORS.danger} size={18} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.recordButton} onPress={toggleRecording}>
+              <View style={styles.recordIcon}>
+                <Feather name="mic" color={COLORS.text} size={24} />
+              </View>
+              <Text style={styles.recordText}>Înregistrează o notă vocală</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Camera */}
@@ -616,6 +742,13 @@ const styles = StyleSheet.create({
   voiceControlDelete: {
     width: 32,
     height: 32,
+  },
+  recordButtonRecording: {
+    backgroundColor: COLORS.danger,
+    borderColor: COLORS.danger,
+  },
+  recordTextRecording: {
+    color: COLORS.background,
   },
   cameraButton: {
     flexDirection: 'row',
