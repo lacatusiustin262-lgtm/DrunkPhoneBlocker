@@ -21,8 +21,7 @@ import { setStatusBarHidden } from 'expo-status-bar'
 import * as ScreenCapture from 'expo-screen-capture'
 import ExpoCamera from 'expo-camera/build/ExpoCamera'
 import { useCameraPermissions } from 'expo-camera'
-import { FileSystem } from 'expo-file-system'
-import { Audio } from 'expo-av'
+import { File } from 'expo-file-system'
 import { Feather } from '@expo/vector-icons'
 import {
   initDb,
@@ -78,13 +77,6 @@ export default function Lock() {
   // Note text
   const [noteText, setNoteText] = useState('')
 
-  // Voice
-  const [recording, setRecording] = useState(false)
-  const recordingRef = useRef<Audio.Recording | null>(null)
-  const [voiceUri, setVoiceUri] = useState<string | null>(null)
-  const [voicePlaying, setVoicePlaying] = useState(false)
-  const soundRef = useRef<Audio.Sound | null>(null)
-
   // Camera
   const [cameraPermission, requestCameraPermission] = useCameraPermissions()
   const [cameraOpen, setCameraOpen] = useState(false)
@@ -119,16 +111,6 @@ export default function Lock() {
     const all = await getPhotos(session.id)
     setPhotos(all.map((p) => ({ uri: p.uri })))
   }, [session])
-
-  useEffect(() => {
-    ;(async () => {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      })
-    })()
-    return () => {}
-  }, [])
 
   useEffect(() => {
     ;(async () => {
@@ -178,67 +160,6 @@ export default function Lock() {
     setNoteText('')
   }
 
-  // Voice recording
-  const toggleRecording = async () => {
-    if (!session) return
-    if (recording) {
-      const rec = recordingRef.current
-      if (rec) {
-        await rec.stopAndUnloadAsync()
-        recordingRef.current = null
-        setRecording(false)
-        const status = await rec.getStatusAsync()
-        if (status.uri) {
-          setVoiceUri(status.uri)
-          await addNote(session.id, 'voice', null, status.uri)
-        }
-      }
-    } else {
-      const permission = await Audio.requestPermissionsAsync()
-      if (permission.status !== 'granted') {
-        Alert.alert('Microfonul este necesar pentru notele vocale.')
-        return
-      }
-      const rec = new Audio.Recording()
-      await rec.prepareToRecordAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      )
-      await rec.startAsync()
-      recordingRef.current = rec
-      setRecording(true)
-      setVoiceUri(null)
-    }
-  }
-
-  const playVoice = async () => {
-    if (!voiceUri) return
-    try {
-      if (soundRef.current) {
-        await soundRef.current.stopAsync()
-        await soundRef.current.unloadAsync()
-      }
-      const sound = new Audio.Sound()
-      soundRef.current = sound
-      setVoicePlaying(true)
-      await sound.loadAsync({ uri: voiceUri })
-      await sound.playAsync()
-      setVoicePlaying(false)
-    } catch (error) {
-      console.error(error)
-      setVoicePlaying(false)
-      Alert.alert('Nu se poate redarea sunetului')
-    }
-  }
-
-  const stopVoice = async () => {
-    if (soundRef.current) {
-      await soundRef.current.stopAsync()
-      await soundRef.current.unloadAsync()
-      soundRef.current = null
-    }
-    setVoicePlaying(false)
-  }
-
   // Camera
   const openCamera = async () => {
     if (Platform.OS === 'web') return
@@ -273,9 +194,9 @@ export default function Lock() {
 
   const deletePhotoItem = async (uri: string) => {
     try {
-      const fileInfo = await FileSystem.getInfoAsync(uri)
-      if (fileInfo.exists) {
-        await FileSystem.deleteAsync(uri)
+      const file = new File(uri)
+      if (file.exists) {
+        file.delete()
       }
     } catch {
       // ignore file errors
@@ -294,9 +215,6 @@ export default function Lock() {
   }
 
   const { h, m, s, text } = formatTimeLeft(timeLeft)
-
-  const recordIconBg = recording ? COLORS.danger : COLORS.surfaceElevated
-  const recordIconBorder = recording ? COLORS.danger : COLORS.surface
 
   if (!session) {
     return null
@@ -406,57 +324,6 @@ export default function Lock() {
           <TouchableOpacity style={styles.saveNoteButton} onPress={saveTextNote}>
             <Text style={styles.saveNoteText}>Salvează nota</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Voice note */}
-        <View style={styles.section}>
-          <View style={styles.sectionRow}>
-            <Text style={styles.sectionTitle}>Notă vocală</Text>
-          </View>
-          <TouchableOpacity style={styles.recordButton} onPress={toggleRecording}>
-            <View
-              style={[
-                styles.recordIcon,
-                { backgroundColor: recordIconBg, borderColor: recordIconBorder },
-              ]}
-            >
-              {recording ? (
-                <Feather name="mic-off" color={COLORS.danger} size={30} />
-              ) : (
-                <Feather name="mic" color={COLORS.text} size={30} />
-              )}
-            </View>
-            <Text style={styles.recordText}>
-              {recording ? 'Înregistrează...' : 'Înregistrează o notă vocală'}
-            </Text>
-          </TouchableOpacity>
-          {voiceUri && (
-            <View style={styles.voiceCard}>
-              <Feather name="image" color={COLORS.accent} size={22} />
-              <Text style={styles.voiceText}>Notă vocală salvată</Text>
-              <View style={styles.voiceControls}>
-                <TouchableOpacity
-                  style={styles.voiceControlButton}
-                  onPress={voicePlaying ? stopVoice : playVoice}
-                >
-                  {voicePlaying ? (
-                    <Feather name="stop-circle" color={COLORS.danger} size={22} />
-                  ) : (
-                    <Feather name="play-circle" color={COLORS.accent} size={22} />
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.voiceControlButton, styles.voiceControlDelete]}
-                  onPress={() => {
-                    stopVoice()
-                    setVoiceUri(null)
-                  }}
-                >
-                  <Feather name="trash-2" color={COLORS.danger} size={20} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
         </View>
 
         {/* Camera */}

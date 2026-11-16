@@ -41,7 +41,8 @@
           "cameraPermission": "Permite aplicatiei sa poarte poze in timpul blocarii telefonului."
         }
       ],
-      "expo-notifications"
+      "expo-notifications",
+      "expo-splash-screen"
     ],
     "extra": {
       "router": {

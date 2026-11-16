@@ -18,7 +18,7 @@ import {
   deleteNote,
   deletePhoto,
 } from '../lib/db'
-import { FileSystem } from 'expo-file-system'
+import { File } from 'expo-file-system'
 import { COLORS, formatTimeLeft } from '../theme'
 
 export default function Morning() {
@@ -61,9 +61,9 @@ export default function Morning() {
 
   const deletePhotoItem = async (id: number, uri: string) => {
     try {
-      const fileInfo = await FileSystem.getInfoAsync(uri)
-      if (fileInfo.exists) {
-        await FileSystem.deleteAsync(uri)
+      const file = new File(uri)
+      if (file.exists) {
+        file.delete()
       }
     } catch {
       // ignore file errors
