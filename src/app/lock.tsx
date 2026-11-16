@@ -19,7 +19,7 @@ import { useKeepAwake } from 'expo-keep-awake'
 import { setBackgroundColorAsync } from 'expo-system-ui'
 import { setStatusBarHidden } from 'expo-status-bar'
 import * as ScreenCapture from 'expo-screen-capture'
-import ExpoCamera from 'expo-camera/build/ExpoCamera'
+import ExpoCamera from 'expo-camera'
 import { useCameraPermissions } from 'expo-camera'
 import { File } from 'expo-file-system'
 import { Feather } from '@expo/vector-icons'
@@ -83,6 +83,7 @@ export default function Lock() {
   const [cameraType, setCameraType] = useState<'front' | 'back'>('back')
   const cameraRef = useRef<any>(null)
   const [photos, setPhotos] = useState<{ uri: string }[]>([])
+const [cameraError, setCameraError] = useState<string | null>(null)
 
   const startTimer = useCallback((endAt: number) => {
     const tick = () => {
@@ -177,16 +178,26 @@ export default function Lock() {
 
   const takePicture = async () => {
     if (!session) return
-    if (cameraRef.current) {
+    if (!cameraRef.current) {
+      setCameraError('Camera nu este initializată. Încearcă din nou.')
+      return
+    }
+    try {
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.85,
         base64: false,
       })
+      setCameraError(null)
       if (session) {
         await addPhoto(session.id, photo.uri)
         setPhotos([...photos, { uri: photo.uri }])
       }
       setCameraOpen(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setCameraError(message)
+      Alert.alert('Eroare la captură', message)
+      console.error(error)
     }
   }
 
@@ -338,6 +349,12 @@ export default function Lock() {
             </View>
             <Text style={styles.cameraText}>Face o poze</Text>
           </TouchableOpacity>
+          {cameraError && (
+            <View style={styles.cameraErrorBox}>
+              <Feather name="alert-circle" color={COLORS.danger} size={18} />
+              <Text style={styles.cameraErrorText}>{cameraError}</Text>
+            </View>
+          )}
           {photos.length > 0 && (
             <View style={styles.photoPreviews}>
               {photos.map((p, i) => {
@@ -610,6 +627,23 @@ const styles = StyleSheet.create({
     borderColor: COLORS.surfaceElevated,
     borderRadius: 16,
     paddingVertical: 16,
+  },
+  cameraErrorBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(244,114,114,0.15)',
+    borderWidth: 1,
+    borderColor: COLORS.danger,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 8,
+  },
+  cameraErrorText: {
+    fontSize: 13,
+    color: COLORS.danger,
+    fontWeight: '600',
   },
   cameraIcon: {
     width: 48,

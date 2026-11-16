@@ -301,3 +301,8 @@ export async function deletePhoto(id: number) {
   const database = await getDb()
   await database.runAsync(`DELETE FROM photos WHERE id = ?`, id)
 }
+
+export async function clearContacts() {
+  const database = await getDb()
+  await database.runAsync(`DELETE FROM emergency_contacts`)
+}

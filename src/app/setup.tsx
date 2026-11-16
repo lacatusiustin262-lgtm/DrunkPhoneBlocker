@@ -16,6 +16,7 @@ import {
   createSession,
   addContact as addDbContact,
   getContacts,
+  clearContacts,
 } from '../lib/db'
 import { requestNotificationPermissions, scheduleUnlockNotification } from '../lib/notifications'
 import { COLORS, DURATIONS } from '../theme'
@@ -73,7 +74,8 @@ export default function Setup() {
       const code = unlockCode.replace(/\D/g, '') || null
       const sessionId = await createSession(hours, code)
 
-      // Salvează contactele de urgență legate de sesiune (stocate global, suficiente pentru MVP)
+      // Resetează contactele de urgență pentru sesiunea curentă (fără dubluri)
+      await clearContacts()
       for (const c of contacts) {
         await addDbContact(c.name, c.phone)
       }
